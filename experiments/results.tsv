@@ -1,0 +1,12 @@
+group	name	nts	prods	initial_score	final_score	heldout_avg	unparseable	covers	precision	exact	recursive	steps	iterations
+paper	parens	3	5	-124.812	-100.91	-0.437804	0	true	1.0000	true	true	2	7
+paper	a2n	2	3	-60.667	-54.4321	-0.290242	0	true	1.0000	true	true	2	7
+paper	abn	3	4	-68.0175	-58.5388	-0.290242	0	true	1.0000	true	true	2	7
+paper	anbn	3	4	-76.1383	-68.7322	-0.336244	0	true	1.0000	true	true	2	7
+paper	palindrome	3	5	-198.878	-120.804	-0.716536	0	true	1.0000	true	true	1	6
+paper	addition	4	7	-203.571	-134.296	-1.11968	0	true	1.0000	true	true	2	7
+paper	shape	5	7	-251.225	-140.646	-0.646156	0	true	1.0000	true	true	4	9
+paper	basic_english	11	22	-470.394	-286.801	-0.986128	0	true	1.0000	true	false	7	12
+synthetic	nested_parens	3	5	-267.458	-149.867	-0.793712	0	true	1.0000	true	true	1	6
+synthetic	nested_anbn	3	4	-93.6716	-68.1568	-0.481173	0	true	1.0000	true	true	1	6
+synthetic	expr	4	8	-424.161	-223.342	-1.29086	0	true	1.0000	true	true	3	8

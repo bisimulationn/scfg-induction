@@ -1,0 +1,4 @@
+(library
+ (name scfg)
+ (flags (:standard -warn-error -a))
+ (modules grammar corpus parse scoring transform search dot experiment))

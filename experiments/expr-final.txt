@@ -1,0 +1,9 @@
+# start = S, 4 nonterminals, 6 terminals, 8 productions
+T_*      -> *                        [0.500]
+S        -> b                        [0.200]
+T_)      -> )                        [1.000]
+S        -> T_( S T_)                [0.200]
+T_*      -> +                        [0.500]
+T_(      -> (                        [1.000]
+S        -> a                        [0.200]
+S        -> S T_* S                  [0.400]

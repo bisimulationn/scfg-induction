@@ -1,0 +1,8 @@
+# start = S, 5 nonterminals, 4 terminals, 7 productions
+S        -> T_d T_a                  [0.273]
+T_b      -> b                        [1.000]
+T_a      -> T_c T_a                  [0.917]
+T_c      -> c                        [1.000]
+T_d      -> d                        [1.000]
+T_a      -> a                        [0.083]
+S        -> T_b T_a S                [0.727]

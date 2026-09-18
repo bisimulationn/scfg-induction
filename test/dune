@@ -1,0 +1,4 @@
+(test
+ (name test_scfg)
+ (flags (:standard -warn-error -a))
+ (libraries scfg))

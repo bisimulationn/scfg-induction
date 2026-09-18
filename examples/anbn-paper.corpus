@@ -1,0 +1,7 @@
+# The paper's running example {ab, aabb, aaabbb}, counts summing to 50.
+# Cook et al.'s exact relative frequencies are not reprinted in the paper, so a
+# decaying distribution is used; uniform counts (e.g. 17/17/16) correctly block
+# the inductive leap under the Bayesian criterion (see the report).
+30: a b
+15: a a b b
+5: a a a b b b

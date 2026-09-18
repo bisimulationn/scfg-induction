@@ -1,0 +1,4 @@
+# Paper, Table 1, row "wcwR, w in {a,b}*":  S -> c | aSa | bSb
+S -> c [0.333]
+S -> a S a [0.333]
+S -> b S b [0.333]

@@ -72,6 +72,27 @@ let () =
     (approx (List.hd gn.Grammar.productions).Grammar.count 3.0)
 
 let () =
+  let left =
+    g "S"
+      [ prod "S" [ nt "A" ]; prod "S" [ nt "B" ]; prod "A" [ tm "a" ];
+        prod "B" [ tm "b" ] ]
+  in
+  let reordered =
+    g "S"
+      [ prod "S" [ nt "B" ]; prod "S" [ nt "A" ]; prod "B" [ tm "b" ];
+        prod "A" [ tm "a" ] ]
+  in
+  let renamed =
+    g "Root"
+      [ prod "Root" [ nt "Right" ]; prod "Left" [ tm "a" ];
+        prod "Root" [ nt "Left" ]; prod "Right" [ tm "b" ] ]
+  in
+  check "canonical form ignores production order"
+    (Grammar.equal_structure left reordered);
+  check "canonical form ignores nonterminal names"
+    (Grammar.equal_structure left renamed)
+
+let () =
   let gs = g "S" [ prod "S" [ nt "S" ]; prod "S" [ tm "a" ] ] in
   let gn = Grammar.normalize gs in
   check "self-loop removed"

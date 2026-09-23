@@ -44,6 +44,19 @@ let () =
   check "viterbi tree exists" (vt <> None)
 
 let () =
+  let recursive =
+    g "S"
+      [ { Grammar.lhs = "S"; rhs = [ tm "a"; nt "S" ]; count = 1.0 };
+        { Grammar.lhs = "S"; rhs = [ tm "a" ]; count = 999.0 } ]
+  in
+  let tokens = List.init 120 (fun _ -> "a") in
+  match Parse.log_inside (Parse.prepare recursive) tokens with
+  | Some probability ->
+      check "log inside survives probability underflow"
+        (Float.is_finite probability && probability < -700.0)
+  | None -> check "log inside survives probability underflow" false
+
+let () =
   let gr = g "S" [ prod "S" [ nt "A"; nt "B" ]; prod "A" [ tm "a" ]; prod "B" [ tm "b" ] ] in
   let prep = Parse.prepare gr in
   let cnt, p = Parse.expected_counts prep [ "a"; "b" ] in

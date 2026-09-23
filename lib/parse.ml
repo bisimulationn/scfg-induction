@@ -110,13 +110,19 @@ let prob_of_prod prep (p : Grammar.production) =
   in
   find idxs
 
-let inside prep tokens =
+let log_add left right =
+  if left = neg_infinity then right
+  else if right = neg_infinity then left
+  else if left >= right then left +. log1p (exp (right -. left))
+  else right +. log1p (exp (left -. right))
+
+let make_log_inside prep tokens =
   let n = List.length tokens in
   let w = Array.of_list tokens in
   let imemo = Hashtbl.create 1024 in
   let smemo = Hashtbl.create 1024 in
   let rec inside_nt nt i j =
-    if j <= i then 0.0
+    if j <= i then neg_infinity
     else
       match Hashtbl.find_opt imemo (nt, i, j) with
       | Some v -> v
@@ -127,9 +133,12 @@ let inside prep tokens =
           let v =
             List.fold_left
               (fun acc pi ->
-                acc
-                +. (prep.probs.(pi) *. seq_inside prep.prods.(pi).rhs i j))
-              0.0 idxs
+                let probability = prep.probs.(pi) in
+                if probability <= 0.0 then acc
+                else
+                  log_add acc
+                    (log probability +. seq_inside prep.prods.(pi).rhs i j))
+              neg_infinity idxs
           in
           Hashtbl.replace imemo (nt, i, j) v;
           v
@@ -139,28 +148,32 @@ let inside prep tokens =
     | None ->
         let v =
           match rhs with
-          | [] -> if i = j then 1.0 else 0.0
+          | [] -> if i = j then 0.0 else neg_infinity
           | Grammar.Term a :: rest ->
               if i < n && String.equal w.(i) a then
                 seq_inside rest (i + 1) j
-              else 0.0
+              else neg_infinity
           | Grammar.Nonterm x :: rest ->
-
-              let acc = ref 0.0 in
+              let acc = ref neg_infinity in
               for k = i + 1 to j - List.length rest do
                 let a = inside_nt x i k in
-                if a > 0.0 then acc := !acc +. (a *. seq_inside rest k j)
+                if a <> neg_infinity then
+                  acc := log_add !acc (a +. seq_inside rest k j)
               done;
               !acc
         in
         Hashtbl.replace smemo (rhs, i, j) v;
         v
   in
-  inside_nt prep.start 0 n
+  (n, inside_nt, seq_inside)
 
 let log_inside prep tokens =
-  let p = inside prep tokens in
-  if p > 0.0 then Some (log p) else None
+  let n, inside_nt, _ = make_log_inside prep tokens in
+  let probability = inside_nt prep.start 0 n in
+  if probability = neg_infinity then None else Some probability
+
+let inside prep tokens =
+  match log_inside prep tokens with None -> 0.0 | Some probability -> exp probability
 
 let viterbi prep tokens =
   let n = List.length tokens in
@@ -244,100 +257,59 @@ let tree_to_string ?(indent = 0) tree =
   in
   go indent tree
 
-let expected_counts prep tokens =
-  let n = List.length tokens in
-  let w = Array.of_list tokens in
-  let imemo = Hashtbl.create 1024 in
-  let smemo = Hashtbl.create 1024 in
-  let rec inside_nt nt i j =
-    if j <= i then 0.0
-    else
-      match Hashtbl.find_opt imemo (nt, i, j) with
-      | Some v -> v
-      | None ->
-          let idxs =
-            Option.value ~default:[] (Hashtbl.find_opt prep.by_lhs nt)
-          in
-          let v =
-            List.fold_left
-              (fun acc pi ->
-                acc
-                +. (prep.probs.(pi) *. seq_inside prep.prods.(pi).rhs i j))
-              0.0 idxs
-          in
-          Hashtbl.replace imemo (nt, i, j) v;
-          v
-  and seq_inside rhs i j =
-    match Hashtbl.find_opt smemo (rhs, i, j) with
-    | Some v -> v
-    | None ->
-        let v =
-          match rhs with
-          | [] -> if i = j then 1.0 else 0.0
-          | Grammar.Term a :: rest ->
-              if i < n && String.equal w.(i) a then seq_inside rest (i + 1) j
-              else 0.0
-          | Grammar.Nonterm x :: rest ->
-
-              let acc = ref 0.0 in
-              for k = i + 1 to j - List.length rest do
-                let a = inside_nt x i k in
-                if a > 0.0 then acc := !acc +. (a *. seq_inside rest k j)
-              done;
-              !acc
-        in
-        Hashtbl.replace smemo (rhs, i, j) v;
-        v
-  in
+let expected_counts_log prep tokens =
+  let n, inside_nt, seq_inside = make_log_inside prep tokens in
   let ptotal = inside_nt prep.start 0 n in
   let np = Array.length prep.prods in
-  if ptotal <= 0.0 then (Array.make np 0.0, 0.0)
+  if ptotal = neg_infinity then (Array.make np 0.0, neg_infinity)
   else begin
     let omemo = Hashtbl.create 1024 in
     let get_o nt i j =
-      Option.value ~default:0.0 (Hashtbl.find_opt omemo (nt, i, j))
+      Option.value ~default:neg_infinity (Hashtbl.find_opt omemo (nt, i, j))
     in
     let add_o nt i j v =
-      Hashtbl.replace omemo (nt, i, j) (get_o nt i j +. v)
+      Hashtbl.replace omemo (nt, i, j) (log_add (get_o nt i j) v)
     in
-    add_o prep.start 0 n 1.0;
+    add_o prep.start 0 n 0.0;
     for len = n downto 1 do
       for p = 0 to n - len do
         let q = p + len in
         List.iter
           (fun b ->
             let ob = get_o b p q in
-            if ob > 0.0 then
+            if ob <> neg_infinity then
               List.iter
                 (fun pi ->
                   let prod = prep.prods.(pi) in
                   if String.equal prod.lhs b then begin
                     let prob = prep.probs.(pi) in
-                    let arr = Array.of_list prod.rhs in
-                    let m = Array.length arr in
-                    Array.iteri
-                      (fun k s ->
-                        match s with
-                        | Grammar.Nonterm x ->
-                            let left =
-                              Array.to_list (Array.sub arr 0 k)
-                            in
-                            let right =
-                              Array.to_list
-                                (Array.sub arr (k + 1) (m - k - 1))
-                            in
-                            for i = p to q do
-                              let lw = seq_inside left p i in
-                              if lw > 0.0 then
-                                for j = i to q do
-                                  let rw = seq_inside right j q in
-                                  if rw > 0.0 then
-                                    add_o x i j
-                                      (ob *. prob *. lw *. rw)
-                                done
-                            done
-                        | Grammar.Term _ -> ())
-                      arr
+                    if prob > 0.0 then begin
+                      let arr = Array.of_list prod.rhs in
+                      let m = Array.length arr in
+                      Array.iteri
+                        (fun k s ->
+                          match s with
+                          | Grammar.Nonterm x ->
+                              let left =
+                                Array.to_list (Array.sub arr 0 k)
+                              in
+                              let right =
+                                Array.to_list
+                                  (Array.sub arr (k + 1) (m - k - 1))
+                              in
+                              for i = p to q do
+                                let lw = seq_inside left p i in
+                                if lw <> neg_infinity then
+                                  for j = i to q do
+                                    let rw = seq_inside right j q in
+                                    if rw <> neg_infinity then
+                                      add_o x i j
+                                        (ob +. log prob +. lw +. rw)
+                                  done
+                              done
+                          | Grammar.Term _ -> ())
+                        arr
+                    end
                   end)
                 (Option.value ~default:[]
                    (Hashtbl.find_opt prep.by_lhs b)))
@@ -348,18 +320,24 @@ let expected_counts prep tokens =
     Array.iteri
       (fun pi (prod : Grammar.production) ->
         let prob = prep.probs.(pi) in
-        let s = ref 0.0 in
+        let s = ref neg_infinity in
         for i = 0 to n do
           for j = i to n do
             let o = get_o prod.lhs i j in
-            if o > 0.0 then
-              s := !s +. (o *. seq_inside prod.rhs i j)
+            if o <> neg_infinity then
+              s := log_add !s (o +. seq_inside prod.rhs i j)
           done
         done;
-        counts.(pi) <- prob *. !s /. ptotal)
+        counts.(pi) <-
+          if prob <= 0.0 || !s = neg_infinity then 0.0
+          else exp (log prob +. !s -. ptotal))
       prep.prods;
     (counts, ptotal)
   end
+
+let expected_counts prep tokens =
+  let counts, probability = expected_counts_log prep tokens in
+  (counts, exp probability)
 
 let fit_em prep (corpus : Corpus.t) ~iters ~tol =
   let np = Array.length prep.prods in
@@ -372,12 +350,14 @@ let fit_em prep (corpus : Corpus.t) ~iters ~tol =
        ll := 0.0;
        List.iter
          (fun s ->
-           let cnt, p = expected_counts prep s.Corpus.tokens in
-           if p > 0.0 then begin
+           let cnt, log_probability =
+             expected_counts_log prep s.Corpus.tokens
+           in
+           if log_probability <> neg_infinity then begin
              Array.iteri
                (fun i x -> acc.(i) <- acc.(i) +. (s.Corpus.count *. x))
                cnt;
-             ll := !ll +. (s.Corpus.count *. log p)
+             ll := !ll +. (s.Corpus.count *. log_probability)
            end)
          corpus;
        Hashtbl.iter

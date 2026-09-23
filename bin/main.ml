@@ -46,10 +46,11 @@ let config_of_opts opts =
     em_iters = int_opt opts "em-iters" Scoring.default_config.em_iters;
     max_chunk = int_opt opts "max-chunk" Scoring.default_config.max_chunk;
     mode =
-      (match opt opts "mode" "marginal" with
+      (match opt opts "mode" "approximate" with
       | "ml" -> Scoring.Maximum_likelihood
       | "variational" -> Scoring.Variational
-      | _ -> Scoring.Marginal);
+      | "approximate" | "marginal" -> Scoring.Approximate_evidence
+      | mode -> invalid_arg ("unknown scoring mode: " ^ mode));
     chunk_occurrence =
       (if opt opts "chunk-occurrence" "all" = "first" then
          Scoring.First_occurrence
@@ -63,7 +64,7 @@ let usage () =
      Commands:\n\
     \  induce       --corpus FILE [--out DIR] [--beam N] [--max-steps N]\n\
     \               [--patience N] [--alpha A] [--prior W] [--max-chunk N]\n\
-    \               [--em-iters N] [--mode marginal|ml|variational]\n\
+    \               [--em-iters N] [--mode approximate|ml|variational]\n\
     \               [--chunk-occurrence all|first] [--render]\n\
     \               [--search beam|bestfirst] [--frontier N] [--max-expansions N]\n\
     \  score        --grammar FILE --corpus FILE [--alpha A] [--prior W]\n\
@@ -159,8 +160,8 @@ let cmd_induce opts =
     result.Search.iterations (List.length result.Search.steps);
   Printf.printf "posterior: %.4f -> %.4f\n" result.Search.initial_score
     result.Search.best_score;
-  Printf.printf "structure prior %.4f, marginal loglik %.4f, dl %.1f bits\n"
-    details.Scoring.prior details.Scoring.marginal details.Scoring.dl_bits;
+  Printf.printf "structure prior %.4f, objective %.4f, dl %.1f bits\n"
+    details.Scoring.prior details.Scoring.objective details.Scoring.dl_bits;
   Printf.printf "final grammar: %d nonterminals, %d productions\n"
     details.Scoring.num_nonterminals details.Scoring.num_productions;
   print_endline "\nfinal grammar:";
@@ -178,7 +179,9 @@ let cmd_score opts =
   let d = Scoring.details ~config g corpus in
   Printf.printf "posterior            %.6f\n" d.Scoring.posterior;
   Printf.printf "structural prior     %.6f\n" d.Scoring.prior;
-  Printf.printf "marginal loglik      %.6f\n" d.Scoring.marginal;
+  Printf.printf "objective             %.6f\n" d.Scoring.objective;
+  Printf.printf "approximate evidence  %.6f\n"
+    d.Scoring.approximate_evidence;
   Printf.printf "ML corpus loglik     %.6f\n" d.Scoring.ml_loglik;
   Printf.printf "description length   %.2f bits\n" d.Scoring.dl_bits;
   Printf.printf "nonterminals         %d\n" d.Scoring.num_nonterminals;

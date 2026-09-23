@@ -1,4 +1,4 @@
-type score_mode = Marginal | Maximum_likelihood | Variational
+type score_mode = Approximate_evidence | Maximum_likelihood | Variational
 
 type chunk_occurrence = All_occurrences | First_occurrence
 
@@ -19,7 +19,7 @@ let default_config =
     em_iters = 8;
     em_tol = 1e-7;
     max_chunk = 2;
-    mode = Marginal;
+    mode = Approximate_evidence;
     chunk_occurrence = All_occurrences;
   }
 
@@ -95,7 +95,8 @@ let description_length_bits (g : Grammar.t) =
 let structural_logprior ?(config = default_config) (g : Grammar.t) =
   -.config.prior_weight *. description_length_bits g *. log 2.0
 
-let marginal_loglik ?(config = default_config) (g : Grammar.t) (corpus : Corpus.t) =
+let approximate_log_evidence ?(config = default_config) (g : Grammar.t)
+    (corpus : Corpus.t) =
 
   let uprep = Parse.prepare_uniform g in
   if
@@ -228,15 +229,16 @@ let posterior ?(config = default_config) g corpus =
   match config.mode with
   | Variational -> prior +. variational_loglik ~config g corpus
   | _ ->
-      let marg, ll, _, _ = marginal_loglik ~config g corpus in
+      let evidence, ll, _, _ = approximate_log_evidence ~config g corpus in
       (match config.mode with
-      | Marginal -> prior +. marg
+      | Approximate_evidence -> prior +. evidence
       | Maximum_likelihood -> prior +. ll
       | Variational -> assert false)
 
 type details = {
   prior : float;
-  marginal : float;
+  objective : float;
+  approximate_evidence : float;
   ml_loglik : float;
   posterior : float;
   dl_bits : float;
@@ -245,18 +247,19 @@ type details = {
 }
 
 let details ?(config = default_config) (g : Grammar.t) (corpus : Corpus.t) =
-  let marg, ll, _, _ = marginal_loglik ~config g corpus in
+  let evidence, ll, _, _ = approximate_log_evidence ~config g corpus in
   let prior = structural_logprior ~config g in
   let dl = description_length_bits g in
   let likelihood =
     match config.mode with
-    | Marginal -> marg
+    | Approximate_evidence -> evidence
     | Maximum_likelihood -> ll
     | Variational -> variational_loglik ~config g corpus
   in
   {
     prior;
-    marginal = likelihood;
+    objective = likelihood;
+    approximate_evidence = evidence;
     ml_loglik = ll;
     posterior = prior +. likelihood;
     dl_bits = dl;

@@ -148,14 +148,14 @@ let () =
   let cfg = { Scoring.default_config with alpha = 1.0; em_iters = 5 } in
   let g1 = g "S" [ prod "S" [ tm "a" ] ] in
   let m1, _, _, _ =
-    Scoring.marginal_loglik ~config:cfg g1 [ sample [ "a" ] 1.0 ]
+    Scoring.approximate_log_evidence ~config:cfg g1 [ sample [ "a" ] 1.0 ]
   in
-  check "marginal(S->a, {a}, alpha=1) = 0" (approx m1 0.0);
+  check "evidence(S->a, {a}, alpha=1) = 0" (approx m1 0.0);
   let g2 = g "S" [ prod "S" [ tm "a" ]; prod "S" [ tm "b" ] ] in
   let m2, _, _, _ =
-    Scoring.marginal_loglik ~config:cfg g2 [ sample [ "a" ] 1.0 ]
+    Scoring.approximate_log_evidence ~config:cfg g2 [ sample [ "a" ] 1.0 ]
   in
-  check "marginal(S->a|b, {a}, alpha=1) = log 1/2"
+  check "evidence(S->a|b, {a}, alpha=1) = log 1/2"
     (approx m2 (log 0.5))
 
 let paper_initial () =
@@ -308,9 +308,11 @@ let () =
   check "variational ELBO (single production) = 0"
     (approx d1.Scoring.posterior 0.0 ~tol:1e-6);
   let g2 = g "S" [ prod "S" [ tm "a" ]; prod "S" [ tm "b" ] ] in
-  let dm = Scoring.details ~config:(mk Scoring.Marginal) g2 corpus in
+  let dm =
+    Scoring.details ~config:(mk Scoring.Approximate_evidence) g2 corpus
+  in
   let dv = Scoring.details ~config:(mk Scoring.Variational) g2 corpus in
-  check "variational matches marginal (unambiguous)"
+  check "variational matches approximate evidence (unambiguous)"
     (approx dv.Scoring.posterior dm.Scoring.posterior ~tol:1e-6)
 
 let () =

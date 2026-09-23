@@ -96,6 +96,21 @@ let () =
   check "unit productions chain preserved" (has_prod gn "A" [ nt "B" ])
 
 let () =
+  List.iter
+    (fun (a, b, c) ->
+      let gu =
+        g "S"
+          [ prod "S" [ nt a ]; prod a [ nt b ]; prod b [ nt c ];
+            prod c [ tm "a" ] ]
+      in
+      let counts, probability = Parse.expected_counts (Parse.prepare gu) [ "a" ] in
+      check "unit chain probability" (approx probability 1.0);
+      Array.iter
+        (fun count -> check "unit chain expected count" (approx count 1.0))
+        counts)
+    [ ("A", "B", "C"); ("X", "Y", "Z"); ("Q", "R", "T") ]
+
+let () =
   let cfg = { Scoring.default_config with alpha = 1.0; em_iters = 5 } in
   let g1 = g "S" [ prod "S" [ tm "a" ] ] in
   let m1, _, _, _ =
